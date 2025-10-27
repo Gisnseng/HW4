@@ -8,6 +8,8 @@ from Ant import UNIT_STATS
 from Move import Move
 from GameState import *
 from AIPlayerUtils import *
+import os
+import random
 
 
 ##
@@ -18,7 +20,81 @@ from AIPlayerUtils import *
 #
 #Variables:
 #   playerId - The id of the player.
-##
+## HW 4 variables
+gene_list = [] # list of genes
+index = 0 #index
+fitness_list = [] # list of fitnesses
+population_size = 3 # inital population size
+games_left = 5 # games_left to determine fitness
+file_path = "phamt27_population.txt" # file path
+
+#genes
+#1 player food amount
+#2 player soldier amount
+#3 player ranger amount
+#4 player drone amount
+#5 player worker amount
+#6 hp of player queen
+#7 how many more food player has than enemy
+#8 how much more health player queen has than enemy queen
+#9 enemy worker amount
+#10 distance of closest ally combatant to enemy queen
+
+#strange genes
+closest_worker_queen = 0 #11 distance of closest ally worker to enemy queen
+engagement = 0 #12 distance between closest ally and enemy combatant
+
+
+#HW 4 methods
+def init_population():
+    for i in range(population_size): # reset fitness values
+        fitness_list.append(-1)
+    index = 0 #reset index
+
+    if os.path.exists(file_path):
+        pass
+    else:
+        file = open(file_path, "w")
+        for i in range(population_size):
+            for i in range(12):
+                val = random.random() * 20 - 10
+                file.write(str(val))
+                file.write("\n")
+            file.write("\n")
+        file.close()
+    #set gene variables
+    #Gene 1
+
+def vertical_dance(list1, list2): # input two lists of floats, return two lists of floats
+    list3 = []
+    list4 = []
+    for i in range(len(list1) - 1):
+        diff = list1[i] - list2[i]
+        mutate = (random.random()-.5) #random between -0.5 and 0.5
+        list3[i] = list1[i] - random.random() * diff + mutate
+        mutate2 = (random.random()-.5) #random between -0.5 and 0.5
+        list4[i] = list1[i] - random.random() * diff + mutate2
+    ret = [list[3], list[4]]
+    return ret
+
+def generate_new_generation():
+    half = population_size / 2 #divide population by two, rounded down
+
+# kill half, prioritize bad
+
+
+# mate the remaining genes
+    pass
+
+def read_genes(index):
+#increment to index
+    index_to_go = index
+    file = open(file_path, "w")
+    while index_to_go > 0:
+        pass
+
+def gene_utility():
+    pass
 
 #HW 3 methods here - Modified for Minimax with alpha-beta pruning
 def expandNode(node, player_id):
@@ -56,6 +132,13 @@ def get_enemy_id(player_id):
         return 1 - player_id  # Fallback
 
 def utility(state, player_id): 
+    #HW 4 genes
+
+
+
+
+
+
     """Modified to take player_id for proper evaluation"""
     enemy_id = get_enemy_id(player_id)
     
@@ -214,7 +297,9 @@ class AIPlayer(Player):
 
     def __init__(self, inputPlayerId):
         super(AIPlayer,self).__init__(inputPlayerId, "soldier_rush2")
-    
+
+    init_population()
+
     def getPlacement(self, currentState):
         numToPlace = 0
         if currentState.phase == SETUP_PHASE_1:
@@ -299,4 +384,13 @@ class AIPlayer(Player):
         return enemyLocations[random.randint(0, len(enemyLocations) - 1)]
 
     def registerWin(self, hasWon):
+        if (games_left > 0): # decrement game counter or reset if done
+            games_left -= 1
+        else:
+            games_left = 5 # reset and increase index
+            if (index < population_size - 1):
+                index += 1
+            else: #if all indexes tested, create new generation
+                generate_new_generation()
+                index = 0
         pass
