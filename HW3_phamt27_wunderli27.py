@@ -21,12 +21,15 @@ import random
 #Variables:
 #   playerId - The id of the player.
 ## HW 4 variables
+games_to_play = 5
+games_left = games_to_play # games_left to determine fitness
 gene_list = [] # list of genes
 index = 0 #index
 fitness_list = [] # list of fitnesses
-population_size = 3 # inital population size
-games_left = 5 # games_left to determine fitness
-file_path = "phamt27_population.txt" # file path
+population_size = 10 # inital population size
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+file_path = os.path.join(BASE_DIR, "phamt27_population.txt")
+games_won = 0
 
 #genes
 #1 player food amount
@@ -36,13 +39,13 @@ file_path = "phamt27_population.txt" # file path
 #5 player worker amount
 #6 hp of player queen
 #7 how many more food player has than enemy
-#8 how much more health player queen has than enemy queen
+#8 enemy queen hp
 #9 enemy worker amount
-#10 distance of closest ally combatant to enemy queen
+#10 enemy drone amount
 
 #strange genes
-closest_worker_queen = 0 #11 distance of closest ally worker to enemy queen
-engagement = 0 #12 distance between closest ally and enemy combatant
+#11 distance of closest ally worker to enemy queen
+#12 distance between closest ally and enemy combatant
 
 
 #HW 4 methods
@@ -62,39 +65,116 @@ def init_population():
                 file.write("\n")
             file.write("\n")
         file.close()
-    #set gene variables
-    #Gene 1
+
 
 def vertical_dance(list1, list2): # input two lists of floats, return two lists of floats
     list3 = []
     list4 = []
-    for i in range(len(list1) - 1):
-        diff = list1[i] - list2[i]
-        mutate = (random.random()-.5) #random between -0.5 and 0.5
-        list3[i] = list1[i] - random.random() * diff + mutate
-        mutate2 = (random.random()-.5) #random between -0.5 and 0.5
-        list4[i] = list1[i] - random.random() * diff + mutate2
-    ret = [list[3], list[4]]
+    slice1 = random.randint(0, 11)
+    slice2 = random.randint(0, 11)
+    for a in list1[:slice1]:
+        list3.append(a)
+    for b in list2[slice1:]:
+        list3.append(b)
+    for c in list2[:slice2]:
+        list4.append(c)
+    for d in list1[slice2:]:
+        list4.append(d)
+    for e in range(len(list3)):
+        list3[e] *= (random.random() - 0.5) * .2
+    for f in range(len(list4)):
+        list4[f] *= (random.random() - 0.5) * .2
+    ret = [list3, list4]
     return ret
 
 def generate_new_generation():
+    print("kill started")
     half = population_size / 2 #divide population by two, rounded down
+    pop_to_erase = [] # array of population numbers to "kill" and replace with mates
+    remain_pop = []
+    mean = 0 # mean population, kill all below this unless exceeds half
+    for i in fitness_list:
+        mean += i
+    mean /= len(fitness_list)
+    for i in range(len(fitness_list)): # mark half below mean for death
+        if fitness_list[i] < (mean + .01) and half > 0:
+            pop_to_erase.append(i)
+            half -= 1
+    for i in range(len(fitness_list)):
+        if i in pop_to_erase:
+            pass
+        else:
+            remain_pop.append(i)
+    file = open(file_path, "r+")
+    print(pop_to_erase)
+    print(remain_pop)
+    for i in range(len(pop_to_erase)): #kill and replace  
+        file.seek(0, 0)
+        list1 = read_genes(remain_pop[ random.randint(0, len(remain_pop)-1) ])
+        list2 = read_genes(remain_pop[ random.randint(0, len(remain_pop)-1) ])
+        replacement = vertical_dance(list1, list2)[random.randint(0, 1)]
+        #random of the two children
+        lines = file.readlines()
+        counter = 0
+        gene_num = 0
+        for j in range(len(lines)):
+            if counter == pop_to_erase[i] and gene_num < 12:
+                lines[j] = str(replacement[gene_num]) + "\n"
+                gene_num = gene_num + 1
+            if lines[j] == "\n": counter +=1
+        file.seek(0, 0)
+        for k in lines:
+            file.write(k)
+    file.close()
+        
 
-# kill half, prioritize bad
 
-
-# mate the remaining genes
-    pass
-
-def read_genes(index):
+def read_genes(gene_index):
 #increment to index
-    index_to_go = index
-    file = open(file_path, "w")
+    global file_path
+    the_list = []
+    index_to_go = gene_index
+    file = open(file_path, "r")
     while index_to_go > 0:
+        if file.readline() == "\n":
+            index_to_go = index_to_go - 1
+    for i in range(12):
+        the_list.append(str(file.readline()))
+    file.close()
+    for i in range(len(the_list)):
+        the_list[i] = the_list[i][:-2]
+        the_list[i] = float(the_list[i])
+    return the_list
+
+def gene_utility(state):
+    total_utility = 0 #sum of utility
+    total_utility += state.inventories[state.whoseTurn].foodCount * float(gene_list[0]) #gene 1 food count
+    total_utility += len(getAntList(state, state.whoseTurn, (SOLDIER,))) * float(gene_list[1]) #gene 2 soldier amount
+    total_utility += len(getAntList(state, state.whoseTurn, (R_SOLDIER,))) * float(gene_list[2]) #gene 3 ranger amount
+    total_utility += len(getAntList(state, state.whoseTurn, (DRONE,))) * float(gene_list[3]) #gene 4 drone amount
+    total_utility += len(getAntList(state, state.whoseTurn, (WORKER,))) * float(gene_list[4]) #gene 5 worker amount
+    total_utility += getAntList(state, state.whoseTurn, (QUEEN,))[0].health * float(gene_list[5]) #gene 6 hp of queen
+    total_utility += (state.inventories[state.whoseTurn].foodCount - state.inventories[1 - state.whoseTurn].foodCount) * float(gene_list[6]) #gene 7 food differential
+    total_utility += getAntList(state, 1 - state.whoseTurn, (QUEEN,))[0].health * float(gene_list[7]) #gene 8 enemy queen hp
+    total_utility += len(getAntList(state, 1 - state.whoseTurn, (WORKER,))) * float(gene_list[8]) #gene 9 enemy worker amount
+    total_utility += len(getAntList(state, 1 - state.whoseTurn, (DRONE,))) * float(gene_list[9]) #gene 10 enemy drone amount
+    if (len(getAntList(state, state.whoseTurn, (WORKER,))) > 0) and (len(getAntList(state, 1 - state.whoseTurn, (QUEEN,))) > 0):
+        total_utility += stepsToReach(state, getAntList(state, state.whoseTurn, (WORKER,))[0].coords, getAntList(state, 1 - state.whoseTurn, (QUEEN,))[0].coords) * float(gene_list[10]) #gene 11 distance from worker to queen
         pass
 
-def gene_utility():
-    pass
+    if (len(getAntList(state, state.whoseTurn, (SOLDIER,))) > 0) and (len(getAntList(state, 1 - state.whoseTurn, (SOLDIER,))) > 0):
+        total_utility += stepsToReach(state, getAntList(state, state.whoseTurn, (SOLDIER,))[0].coords, getAntList(state, 1 - state.whoseTurn, (SOLDIER,))[0].coords) * float(gene_list[11]) #gene 12 closest ally and enemy
+        pass
+    return total_utility
+
+def get_best_move(state, move_list):
+    best_util = -999
+    best_move = None
+    for move in move_list:
+        if gene_utility(getNextState(state, move)) > best_util:
+            best_util = gene_utility(getNextState(state, move))
+            best_move = move
+    return best_move
 
 #HW 3 methods here - Modified for Minimax with alpha-beta pruning
 def expandNode(node, player_id):
@@ -132,7 +212,6 @@ def get_enemy_id(player_id):
         return 1 - player_id  # Fallback
 
 def utility(state, player_id): 
-    #HW 4 genes
 
 
 
@@ -298,7 +377,6 @@ class AIPlayer(Player):
     def __init__(self, inputPlayerId):
         super(AIPlayer,self).__init__(inputPlayerId, "soldier_rush2")
 
-    init_population()
 
     def getPlacement(self, currentState):
         numToPlace = 0
@@ -332,65 +410,39 @@ class AIPlayer(Player):
             return [(0, 0)]
     
     def getMove(self, currentState):
-        """Modified to use minimax with alpha-beta pruning instead of best-first search"""
-        # CRITICAL CHECK: Verify it's actually our turn
-        if currentState.whoseTurn != self.playerId:
-            actual_player_id = currentState.whoseTurn
-        else:
-            actual_player_id = self.playerId
-        
         # Get all legal moves from current state
         legal_moves = listAllLegalMoves(currentState)
-        
-        # SPEED OPTIMIZATION: Limit number of moves to explore at root
-        if len(legal_moves) > 10:
-            # Quick evaluation to rank moves
-            scored_moves = []
-            for move in legal_moves:
-                # Skip most BUILD moves early game
-                if move.moveType == BUILD:
-                    my_ants = len(getAntList(currentState, actual_player_id, (WORKER, R_SOLDIER)))
-                    if my_ants > 2:
-                        continue
-                
-                # Quick score
-                next_state = getNextStateAdversarial(currentState, move)
-                quick_score = utility(next_state, actual_player_id)
-                scored_moves.append((quick_score, move))
-            
-            # Keep top 10 moves (sort by score, which is first element of tuple)
-            scored_moves.sort(key=lambda x: x[0])
-            legal_moves = [move for score, move in scored_moves[:10]]
-        
-        best_move = None
-        best_value = float('inf')
-        alpha = float('-inf')
-        beta = float('inf')
-        
-        # Evaluate each root-level move using minimax
-        for move in legal_moves:
-            node = createNode(move, currentState, 1, None, actual_player_id)
-            
-            # Search depth 1 (total 2 ply) for speed
-            value, _ = minimax_alpha_beta(node, 1, alpha, beta, actual_player_id)
-            
-            if value < best_value:
-                best_value = value
-                best_move = move
-        
+        best_move = get_best_move(currentState, legal_moves)
         return best_move
     
     def getAttack(self, currentState, attackingAnt, enemyLocations):
         return enemyLocations[random.randint(0, len(enemyLocations) - 1)]
 
     def registerWin(self, hasWon):
+        global games_left
+        global index
+        global gene_list
+        global games_won
+        global games_to_play
+        global fitness_list
+        if hasWon:
+            games_won += 1
         if (games_left > 0): # decrement game counter or reset if done
             games_left -= 1
         else:
+            fitness_list[index] = games_won / games_to_play
             games_left = 5 # reset and increase index
+            gene_list = []
+            games_won = 0
             if (index < population_size - 1):
                 index += 1
+                gene_list = read_genes(index)
             else: #if all indexes tested, create new generation
                 generate_new_generation()
                 index = 0
-        pass
+                gene_list = read_genes(index)
+
+
+init_population()
+gene_list = read_genes(index)
+print(str(gene_list))
